@@ -291,7 +291,8 @@
       display: none;
       position: absolute;
       bottom: calc(100% + 6px);
-      right: 0;
+      left: 0;
+      right: auto;
       min-width: 130px;
       background: rgba(20, 18, 14, 0.92);
       backdrop-filter: blur(14px) saturate(110%);
@@ -1876,11 +1877,29 @@ function closeMobDd(ddEl) {
   if (!ddEl) return;
   ddEl.classList.remove('open');
   const trigger = ddEl.querySelector('.mob-dd-trigger');
+  const menu = ddEl.querySelector('.mob-dd-menu');
   if (trigger) trigger.setAttribute('aria-expanded', 'false');
+  if (menu) menu.style.left = '';
 }
 
 function closeAllMobDds() {
   document.querySelectorAll('.mob-dd.open').forEach(closeMobDd);
+}
+
+function positionMobDdMenu(ddEl) {
+  const menu = ddEl.querySelector('.mob-dd-menu');
+  if (!menu) return;
+  menu.style.left = '0';
+  const pad = 12;
+  const menuRect = menu.getBoundingClientRect();
+  let offset = 0;
+  if (menuRect.right > window.innerWidth - pad) {
+    offset -= menuRect.right - (window.innerWidth - pad);
+  }
+  if (menuRect.left + offset < pad) {
+    offset += pad - (menuRect.left + offset);
+  }
+  if (offset !== 0) menu.style.left = `${offset}px`;
 }
 
 function initMobDd(ddEl, onSelect) {
@@ -1893,6 +1912,7 @@ function initMobDd(ddEl, onSelect) {
     if (!wasOpen) {
       ddEl.classList.add('open');
       trigger.setAttribute('aria-expanded', 'true');
+      positionMobDdMenu(ddEl);
     }
     markActivity();
   });
