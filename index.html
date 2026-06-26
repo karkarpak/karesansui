@@ -58,7 +58,10 @@
   .group { display: flex; align-items: center; gap: 8px; }
   .group + .group {
     padding-left: 14px;
+  }
+  .group-monk + .group {
     border-left: 1px solid rgba(244, 236, 218, 0.14);
+    padding-left: 14px;
   }
   .label {
     font-size: 10px;
@@ -225,10 +228,16 @@
       pointer-events: auto !important;
       transform: translateY(0);
     }
-    .controls .group + .group { padding-left: 5px; }
-    .controls .pace-sel { font-size: 10px; padding: 3px 18px 3px 6px; }
-    .controls .ghost-btn { padding: 4px 4px; }
-    .controls .toggle { gap: 5px; padding: 3px; }
+    .controls {
+      font-size: 11px;
+    }
+    .controls .group + .group { padding-left: 8px; }
+    .controls .group-monk + .group {
+      padding-left: 8px;
+      border-left: 1px solid rgba(244, 236, 218, 0.14);
+    }
+    .controls .ghost-btn { padding: 4px 6px; font-size: 11px; }
+    .controls .toggle { gap: 6px; padding: 4px; font-size: 11px; }
 
     /* Fab: small square button in lower-right corner */
     .mob-fab {
@@ -254,29 +263,73 @@
     /* Toolbar replaces the fab when open */
     .mob-fab.open { display: none; }
 
-    /* Mobile style dropdown */
-    .style-dd { position: relative; }
-    .style-dd-trigger {
+    /* Mobile custom dropdowns */
+    .mob-dd { position: relative; }
+    .mob-dd-trigger {
       display: inline-flex;
       align-items: center;
       gap: 5px;
       appearance: none;
       background: rgba(244, 236, 218, 0.07)
         url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='5'%3E%3Cpath d='M0 0l4 5 4-5z' fill='rgba(244,236,218,0.55)'/%3E%3C/svg%3E")
-        no-repeat right 6px center;
+        no-repeat right 7px center;
       background-size: 7px 4px;
       border: none;
       color: rgba(244, 236, 218, 0.92);
       font: inherit;
-      font-size: 10px;
+      font-size: 11px;
       letter-spacing: 0.06em;
       text-transform: uppercase;
-      padding: 3px 20px 3px 6px;
+      padding: 4px 22px 4px 8px;
       cursor: pointer;
       border-radius: 2px;
       white-space: nowrap;
     }
-    .style-dd-trigger:hover { background-color: rgba(244, 236, 218, 0.10); }
+    .mob-dd-trigger:hover { background-color: rgba(244, 236, 218, 0.10); }
+    .mob-dd-val { font-variant-numeric: tabular-nums; letter-spacing: 0; }
+    .mob-dd-menu {
+      display: none;
+      position: absolute;
+      bottom: calc(100% + 6px);
+      right: 0;
+      min-width: 130px;
+      background: rgba(20, 18, 14, 0.92);
+      backdrop-filter: blur(14px) saturate(110%);
+      -webkit-backdrop-filter: blur(14px) saturate(110%);
+      border: 1px solid rgba(255, 240, 210, 0.10);
+      border-radius: 3px;
+      padding: 4px 0 6px;
+      z-index: 20;
+    }
+    .mob-dd.open .mob-dd-menu { display: block; }
+    .mob-dd-title {
+      padding: 6px 10px 4px;
+      font-size: 9px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: rgba(244, 236, 218, 0.45);
+      border-bottom: 1px solid rgba(244, 236, 218, 0.08);
+      margin-bottom: 2px;
+    }
+    .mob-dd-opt {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      width: 100%;
+      appearance: none;
+      background: transparent;
+      border: none;
+      color: rgba(244, 236, 218, 0.92);
+      font: inherit;
+      font-size: 11px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      padding: 8px 10px;
+      cursor: pointer;
+      text-align: left;
+    }
+    .mob-dd-opt:hover { background: rgba(244, 236, 218, 0.10); }
+    .mob-dd-opt.active { background: rgba(244, 236, 218, 0.14); }
     .style-dd-dot {
       width: 12px; height: 12px;
       border-radius: 50%;
@@ -297,40 +350,6 @@
     .style-dd-dot[data-style="C"] { background: #efebe2; --rock-swatch: #c8bca5; }
     .style-dd-dot[data-style="A"] { background: #e6d8b5; --rock-swatch: #1f1b15; }
     .style-dd-dot[data-style="B"] { background: #d8d2c4; --rock-swatch: #4d4842; }
-    .style-dd-menu {
-      display: none;
-      position: absolute;
-      bottom: calc(100% + 6px);
-      right: 0;
-      min-width: 130px;
-      background: rgba(20, 18, 14, 0.92);
-      backdrop-filter: blur(14px) saturate(110%);
-      -webkit-backdrop-filter: blur(14px) saturate(110%);
-      border: 1px solid rgba(255, 240, 210, 0.10);
-      border-radius: 3px;
-      padding: 4px 0;
-      z-index: 20;
-    }
-    .style-dd.open .style-dd-menu { display: block; }
-    .style-dd-opt {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      width: 100%;
-      appearance: none;
-      background: transparent;
-      border: none;
-      color: rgba(244, 236, 218, 0.92);
-      font: inherit;
-      font-size: 10px;
-      letter-spacing: 0.06em;
-      text-transform: uppercase;
-      padding: 7px 10px;
-      cursor: pointer;
-      text-align: left;
-    }
-    .style-dd-opt:hover { background: rgba(244, 236, 218, 0.10); }
-    .style-dd-opt.active { background: rgba(244, 236, 218, 0.14); }
   }
 </style>
 </head>
@@ -349,24 +368,41 @@
       </div>
     </div>
     <div class="group mob-only" title="Number of teeth on the rake">
-      <select class="pace-sel" id="teeth-sel-mob" aria-label="Teeth">
-        <option value="1">1</option>
-        <option value="2">2</option>
-        <option value="3">3</option>
-        <option value="4">4</option>
-        <option value="5" selected>5</option>
-        <option value="6">6</option>
-        <option value="7">7</option>
-        <option value="8">8</option>
-        <option value="9">9</option>
-      </select>
+      <div class="mob-dd" id="teeth-dd">
+        <button type="button" class="mob-dd-trigger" id="teeth-dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+          <span class="mob-dd-val">5</span>
+        </button>
+        <div class="mob-dd-menu" role="listbox" aria-label="Teeth">
+          <div class="mob-dd-title">Teeth Number</div>
+          <button type="button" class="mob-dd-opt" role="option" data-value="1">1</button>
+          <button type="button" class="mob-dd-opt" role="option" data-value="2">2</button>
+          <button type="button" class="mob-dd-opt" role="option" data-value="3">3</button>
+          <button type="button" class="mob-dd-opt" role="option" data-value="4">4</button>
+          <button type="button" class="mob-dd-opt active" role="option" data-value="5" aria-selected="true">5</button>
+          <button type="button" class="mob-dd-opt" role="option" data-value="6">6</button>
+          <button type="button" class="mob-dd-opt" role="option" data-value="7">7</button>
+          <button type="button" class="mob-dd-opt" role="option" data-value="8">8</button>
+          <button type="button" class="mob-dd-opt" role="option" data-value="9">9</button>
+        </div>
+      </div>
     </div>
     <div class="group" title="How quickly the rake draws each stroke">
-      <select class="pace-sel" id="pace-sel" aria-label="Pace">
+      <select class="pace-sel desk-only" id="pace-sel" aria-label="Pace">
         <option value="slow">Slow</option>
         <option value="calm" selected>Calm</option>
         <option value="brisk">Brisk</option>
       </select>
+      <div class="mob-dd mob-only" id="pace-dd-mob">
+        <button type="button" class="mob-dd-trigger" id="pace-dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+          <span class="mob-dd-val">Calm</span>
+        </button>
+        <div class="mob-dd-menu" role="listbox" aria-label="Pace">
+          <div class="mob-dd-title">Speed</div>
+          <button type="button" class="mob-dd-opt" role="option" data-value="slow">Slow</button>
+          <button type="button" class="mob-dd-opt active" role="option" data-value="calm" aria-selected="true">Calm</button>
+          <button type="button" class="mob-dd-opt" role="option" data-value="brisk">Brisk</button>
+        </div>
+      </div>
     </div>
     <div class="group desk-only" title="Switch garden style">
       <div class="styles" id="style-row">
@@ -376,25 +412,26 @@
       </div>
     </div>
     <div class="group mob-only" title="Switch garden style">
-      <div class="style-dd" id="style-dd" data-style="C">
-        <button type="button" class="style-dd-trigger" id="style-dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+      <div class="mob-dd" id="style-dd" data-style="C">
+        <button type="button" class="mob-dd-trigger" id="style-dd-trigger" aria-haspopup="listbox" aria-expanded="false">
           <span class="style-dd-dot" data-style="C"></span>
-          <span class="style-dd-label">Ivory</span>
+          <span class="mob-dd-val style-dd-label">Ivory</span>
         </button>
-        <div class="style-dd-menu" role="listbox" aria-label="Garden style">
-          <button type="button" class="style-dd-opt active" role="option" data-style="C" aria-selected="true">
+        <div class="mob-dd-menu" role="listbox" aria-label="Garden style">
+          <div class="mob-dd-title">This Color</div>
+          <button type="button" class="mob-dd-opt active" role="option" data-style="C" aria-selected="true">
             <span class="style-dd-dot" data-style="C"></span> Ivory
           </button>
-          <button type="button" class="style-dd-opt" role="option" data-style="A" aria-selected="false">
+          <button type="button" class="mob-dd-opt" role="option" data-style="A" aria-selected="false">
             <span class="style-dd-dot" data-style="A"></span> Cream
           </button>
-          <button type="button" class="style-dd-opt" role="option" data-style="B" aria-selected="false">
+          <button type="button" class="mob-dd-opt" role="option" data-style="B" aria-selected="false">
             <span class="style-dd-dot" data-style="B"></span> Neutral
           </button>
         </div>
       </div>
     </div>
-    <div class="group">
+    <div class="group group-monk">
       <div class="toggle" id="ambient" role="switch" aria-checked="false" tabindex="0" title="Let the monk work">
         <span class="dot"></span>
         <span>Monk</span>
@@ -1714,15 +1751,19 @@ cvs.addEventListener('pointercancel', () => {
 function setTeeth(n) {
   teeth = clamp(Math.round(n), 1, 9);
   teethVal.textContent = teeth;
-  const teethMob = document.getElementById('teeth-sel-mob');
-  if (teethMob && teethMob.value !== String(teeth)) teethMob.value = String(teeth);
+  const teethDd = document.getElementById('teeth-dd');
+  if (teethDd) {
+    const val = teethDd.querySelector('.mob-dd-val');
+    if (val) val.textContent = teeth;
+    teethDd.querySelectorAll('.mob-dd-opt').forEach(opt => {
+      const on = parseInt(opt.dataset.value, 10) === teeth;
+      opt.classList.toggle('active', on);
+      opt.setAttribute('aria-selected', on ? 'true' : 'false');
+    });
+  }
 }
 document.getElementById('t-down').addEventListener('click', () => { setTeeth(teeth - 1); markActivity(); });
 document.getElementById('t-up').addEventListener('click',   () => { setTeeth(teeth + 1); markActivity(); });
-const teethSelMob = document.getElementById('teeth-sel-mob');
-if (teethSelMob) {
-  teethSelMob.addEventListener('change', e => { setTeeth(parseInt(e.target.value, 10)); markActivity(); });
-}
 
 document.getElementById('clear').addEventListener('click', () => {
   fadeOutGrooves();
@@ -1774,11 +1815,23 @@ ambientToggle.addEventListener('keydown', (e) => {
 });
 
 // Pace switcher
+const PACE_LABELS = { slow: 'Slow', calm: 'Calm', brisk: 'Brisk' };
+
 function setPace(name) {
   if (!PACE_MAP[name]) return;
   paceMultiplier = PACE_MAP[name];
   const sel = document.getElementById('pace-sel');
   if (sel && sel.value !== name) sel.value = name;
+  const paceDd = document.getElementById('pace-dd-mob');
+  if (paceDd) {
+    const val = paceDd.querySelector('.mob-dd-val');
+    if (val) val.textContent = PACE_LABELS[name] || name;
+    paceDd.querySelectorAll('.mob-dd-opt').forEach(opt => {
+      const on = opt.dataset.value === name;
+      opt.classList.toggle('active', on);
+      opt.setAttribute('aria-selected', on ? 'true' : 'false');
+    });
+  }
 }
 document.getElementById('pace-sel').addEventListener('change', e => {
   setPace(e.target.value); markActivity();
@@ -1791,11 +1844,11 @@ function updateStyleMobUI(name) {
   const dd = document.getElementById('style-dd');
   if (!dd) return;
   dd.dataset.style = name;
-  const triggerDot = dd.querySelector('.style-dd-trigger .style-dd-dot');
+  const triggerDot = dd.querySelector('.mob-dd-trigger .style-dd-dot');
   const label = dd.querySelector('.style-dd-label');
   if (triggerDot) triggerDot.dataset.style = name;
   if (label) label.textContent = STYLE_LABELS[name] || name;
-  dd.querySelectorAll('.style-dd-opt').forEach(opt => {
+  dd.querySelectorAll('.mob-dd-opt').forEach(opt => {
     const on = opt.dataset.style === name;
     opt.classList.toggle('active', on);
     opt.setAttribute('aria-selected', on ? 'true' : 'false');
@@ -1819,28 +1872,53 @@ document.querySelectorAll('.swatch').forEach(el => {
   el.addEventListener('click', () => { setStyle(el.dataset.style); markActivity(); });
 });
 
-const styleDd = document.getElementById('style-dd');
-const styleDdTrigger = document.getElementById('style-dd-trigger');
-function closeStyleDd() {
-  if (!styleDd) return;
-  styleDd.classList.remove('open');
-  if (styleDdTrigger) styleDdTrigger.setAttribute('aria-expanded', 'false');
+function closeMobDd(ddEl) {
+  if (!ddEl) return;
+  ddEl.classList.remove('open');
+  const trigger = ddEl.querySelector('.mob-dd-trigger');
+  if (trigger) trigger.setAttribute('aria-expanded', 'false');
 }
-if (styleDd && styleDdTrigger) {
-  styleDdTrigger.addEventListener('click', (e) => {
+
+function closeAllMobDds() {
+  document.querySelectorAll('.mob-dd.open').forEach(closeMobDd);
+}
+
+function initMobDd(ddEl, onSelect) {
+  const trigger = ddEl.querySelector('.mob-dd-trigger');
+  if (!trigger) return;
+  trigger.addEventListener('click', (e) => {
     e.stopPropagation();
-    const open = styleDd.classList.toggle('open');
-    styleDdTrigger.setAttribute('aria-expanded', open ? 'true' : 'false');
+    const wasOpen = ddEl.classList.contains('open');
+    closeAllMobDds();
+    if (!wasOpen) {
+      ddEl.classList.add('open');
+      trigger.setAttribute('aria-expanded', 'true');
+    }
     markActivity();
   });
-  styleDd.querySelectorAll('.style-dd-opt').forEach(opt => {
+  ddEl.querySelectorAll('.mob-dd-opt').forEach(opt => {
     opt.addEventListener('click', (e) => {
       e.stopPropagation();
-      setStyle(opt.dataset.style);
-      closeStyleDd();
+      onSelect(opt);
+      closeMobDd(ddEl);
       markActivity();
     });
   });
+}
+
+const teethDd = document.getElementById('teeth-dd');
+if (teethDd) {
+  initMobDd(teethDd, opt => setTeeth(parseInt(opt.dataset.value, 10)));
+}
+
+const paceDdMob = document.getElementById('pace-dd-mob');
+if (paceDdMob) {
+  initMobDd(paceDdMob, opt => setPace(opt.dataset.value));
+}
+
+const styleDd = document.getElementById('style-dd');
+if (styleDd) {
+  initMobDd(styleDd, opt => setStyle(opt.dataset.style));
 }
 
 /* ---- Controls visibility follows the cursor ----
@@ -1876,7 +1954,7 @@ if (isTouch) {
     controlsEl.classList.remove('mob-open');
     mobFab.classList.remove('open');
     mobFab.setAttribute('aria-label', 'Open garden settings');
-    closeStyleDd();
+    closeAllMobDds();
   }
 
   mobFab.addEventListener('click', (e) => {
@@ -1884,12 +1962,15 @@ if (isTouch) {
     const isOpen = controlsEl.classList.toggle('mob-open');
     mobFab.classList.toggle('open', isOpen);
     mobFab.setAttribute('aria-label', isOpen ? 'Close garden settings' : 'Open garden settings');
-    if (!isOpen) closeStyleDd();
+    if (!isOpen) closeAllMobDds();
   });
 
   document.addEventListener('pointerdown', (e) => {
-    if (styleDd?.classList.contains('open') && !styleDd.contains(e.target)) {
-      closeStyleDd();
+    const openDd = e.target.closest?.('.mob-dd.open');
+    if (openDd && !openDd.contains(e.target)) {
+      closeMobDd(openDd);
+    } else if (document.querySelector('.mob-dd.open') && !e.target.closest?.('.mob-dd')) {
+      closeAllMobDds();
     }
     if (controlsEl.classList.contains('mob-open') &&
         !controlsEl.contains(e.target) &&
