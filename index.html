@@ -1,0 +1,1781 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Karesansui</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<style>
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    width: 100%; height: 100%;
+    overflow: hidden;
+    background: #1a1612;
+    font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -webkit-tap-highlight-color: transparent;
+    overscroll-behavior: none;
+    touch-action: none;
+  }
+  #garden {
+    display: block;
+    position: absolute;
+    inset: 0;
+    cursor: crosshair;
+  }
+
+  /* Controls — minimal, tucked, fade when idle */
+  .controls {
+    position: fixed;
+    bottom: 22px;
+    right: 22px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 10px 14px 10px 16px;
+    background: rgba(20, 18, 14, 0.55);
+    backdrop-filter: blur(14px) saturate(110%);
+    -webkit-backdrop-filter: blur(14px) saturate(110%);
+    border: 1px solid rgba(255, 240, 210, 0.10);
+    border-radius: 3px;
+    color: rgba(244, 236, 218, 0.92);
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    user-select: none;
+    transition: opacity 600ms ease;
+    opacity: 0;
+    pointer-events: none;
+    z-index: 10;
+  }
+  /* Visibility is driven by cursor position (see JS):
+     hidden (base) when the cursor is off-screen,
+     .faded when on-screen but away from the corner,
+     .active when in the lower-right corner zone. */
+  .controls.faded  { opacity: 0.16; pointer-events: auto; }
+  .controls.active { opacity: 1;    pointer-events: auto; }
+
+  .group { display: flex; align-items: center; gap: 8px; }
+  .group + .group {
+    padding-left: 14px;
+    border-left: 1px solid rgba(244, 236, 218, 0.14);
+  }
+  .label {
+    font-size: 10px;
+    letter-spacing: 0.20em;
+    color: rgba(244, 236, 218, 0.55);
+  }
+  .stepper { display: flex; align-items: center; gap: 2px; }
+  .stepper button, .ghost-btn {
+    appearance: none;
+    background: transparent;
+    border: none;
+    color: rgba(244, 236, 218, 0.92);
+    font: inherit;
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    padding: 4px 6px;
+    cursor: pointer;
+    border-radius: 2px;
+    transition: background 150ms ease, color 150ms ease;
+  }
+  .stepper button {
+    width: 22px; height: 22px;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 14px; padding: 0; line-height: 1;
+  }
+  .stepper button:hover, .ghost-btn:hover { background: rgba(244, 236, 218, 0.10); }
+  .stepper button:active, .ghost-btn:active { background: rgba(244, 236, 218, 0.18); }
+  .stepper .val {
+    min-width: 18px; text-align: center;
+    font-variant-numeric: tabular-nums;
+    font-size: 13px; letter-spacing: 0;
+    color: rgba(244, 236, 218, 0.95);
+  }
+  .toggle {
+    display: inline-flex; align-items: center; gap: 8px;
+    cursor: pointer; padding: 4px; border-radius: 2px;
+    transition: background 150ms ease;
+  }
+  .toggle:hover { background: rgba(244, 236, 218, 0.10); }
+  .dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: rgba(244, 236, 218, 0.30);
+    transition: background 200ms ease, box-shadow 200ms ease;
+  }
+  .toggle.on .dot {
+    background: rgba(244, 236, 218, 0.95);
+    box-shadow: 0 0 0 3px rgba(244, 236, 218, 0.14);
+  }
+
+  /* Pace selector: compact dropdown */
+  .pace-sel {
+    appearance: none;
+    -webkit-appearance: none;
+    background: rgba(244, 236, 218, 0.07)
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='5'%3E%3Cpath d='M0 0l4 5 4-5z' fill='rgba(244,236,218,0.55)'/%3E%3C/svg%3E")
+      no-repeat right 7px center;
+    background-size: 7px 4px;
+    border: none;
+    color: rgba(244, 236, 218, 0.92);
+    font: inherit;
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 4px 24px 4px 9px;
+    cursor: pointer;
+    outline: none;
+  }
+  .pace-sel option { background: #1a1611; color: rgba(244,236,218,0.92); }
+
+  /* Style switcher: three swatches */
+  .styles { display: flex; align-items: center; gap: 6px; }
+  .swatch {
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    border: 1px solid rgba(244, 236, 218, 0.24);
+    cursor: pointer;
+    position: relative;
+    transition: transform 150ms ease, border-color 200ms ease, box-shadow 200ms ease;
+    overflow: hidden;
+  }
+  .swatch::after {
+    /* the small rock dot inset */
+    content: "";
+    position: absolute;
+    width: 7px; height: 7px;
+    left: 50%; top: 50%;
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
+    background: var(--rock-swatch, #1a1611);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.35);
+  }
+  .swatch:hover { transform: scale(1.08); }
+  .swatch.active {
+    border-color: rgba(244, 236, 218, 0.95);
+    box-shadow: 0 0 0 2px rgba(244, 236, 218, 0.18);
+  }
+  .swatch[data-style="C"] { background: #efebe2; --rock-swatch: #c8bca5; }
+  .swatch[data-style="A"] { background: #e6d8b5; --rock-swatch: #1f1b15; }
+  .swatch[data-style="B"] { background: #d8d2c4; --rock-swatch: #4d4842; }
+
+  /* Subtle mark in the opposite corner */
+  .mark {
+    position: fixed;
+    top: 22px; left: 24px;
+    color: rgba(255, 248, 230, 0.55);
+    mix-blend-mode: difference;
+    font-size: 10px;
+    letter-spacing: 0.42em;
+    text-transform: uppercase;
+    pointer-events: none;
+    user-select: none;
+    transition: opacity 900ms ease;
+    z-index: 10;
+  }
+  .mark.idle { opacity: 0.45; }
+
+  @media (max-width: 560px) {
+    .controls {
+      font-size: 10px;
+      gap: 8px 10px;
+      padding: 7px 10px;
+      bottom: 12px;
+      right: 12px;
+      left: 12px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      max-width: calc(100vw - 24px);
+    }
+    .group + .group { padding-left: 8px; }
+    .swatch { width: 18px; height: 18px; }
+    .swatch::after { width: 6px; height: 6px; }
+    .pace-sel { font-size: 10px; padding: 3px 20px 3px 7px; }
+  }
+  /* Mobile fab button — hidden on desktop */
+  .mob-fab {
+    display: none;
+  }
+  @media (pointer: coarse) {
+    /* Controls are hidden by default on touch; shown when .mob-open */
+    .controls {
+      opacity: 0 !important;
+      pointer-events: none !important;
+      bottom: 60px;
+      right: 12px;
+      left: 12px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      max-width: calc(100vw - 24px);
+      transition: opacity 220ms ease, transform 220ms ease;
+      transform: translateY(6px);
+    }
+    .controls.mob-open {
+      opacity: 1 !important;
+      pointer-events: auto !important;
+      transform: translateY(0);
+    }
+    /* Fab: small square button in lower-right corner */
+    .mob-fab {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: fixed;
+      bottom: 12px;
+      right: 12px;
+      width: 40px;
+      height: 40px;
+      background: rgba(20, 18, 14, 0.55);
+      backdrop-filter: blur(14px) saturate(110%);
+      -webkit-backdrop-filter: blur(14px) saturate(110%);
+      border: 1px solid rgba(255, 240, 210, 0.10);
+      border-radius: 3px;
+      color: rgba(244, 236, 218, 0.40);
+      cursor: pointer;
+      z-index: 11;
+      transition: color 200ms ease, background 200ms ease;
+      padding: 0;
+      appearance: none;
+      user-select: none;
+    }
+    .mob-fab.open {
+      color: rgba(244, 236, 218, 0.92);
+      background: rgba(20, 18, 14, 0.78);
+    }
+  }
+</style>
+</head>
+<body>
+  <canvas id="garden"></canvas>
+  <div class="mark" id="mark">枯山水 — Karesansui</div>
+
+  <button class="mob-fab" id="mob-fab" aria-label="Open garden settings">
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <line x1="2" y1="5" x2="16" y2="5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+      <line x1="5"  y1="5" x2="5"  y2="10" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"/>
+      <line x1="9"  y1="5" x2="9"  y2="10" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"/>
+      <line x1="13" y1="5" x2="13" y2="10" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"/>
+      <line x1="9"  y1="10" x2="9" y2="14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+    </svg>
+  </button>
+  <div class="controls" id="controls" aria-label="Rake controls">
+    <div class="group" title="Number of teeth on the rake">
+      <span class="label">Teeth</span>
+      <div class="stepper">
+        <button id="t-down" aria-label="Fewer teeth">−</button>
+        <span class="val" id="t-val">5</span>
+        <button id="t-up" aria-label="More teeth">+</button>
+      </div>
+    </div>
+    <div class="group" title="How quickly the rake draws each stroke">
+      <select class="pace-sel" id="pace-sel" aria-label="Pace">
+        <option value="slow">Slow</option>
+        <option value="calm" selected>Calm</option>
+        <option value="brisk">Brisk</option>
+      </select>
+    </div>
+    <div class="group" title="Switch garden style">
+      <div class="styles" id="style-row">
+        <div class="swatch active" data-style="C" title="Cool ivory sand, pale stones"></div>
+        <div class="swatch" data-style="A" title="Warm cream sand, dark stones"></div>
+        <div class="swatch" data-style="B" title="Pale neutral sand, weathered stones"></div>
+      </div>
+    </div>
+    <div class="group">
+      <div class="toggle" id="ambient" role="switch" aria-checked="false" tabindex="0" title="Let the monk work">
+        <span class="dot"></span>
+        <span>Monk</span>
+      </div>
+    </div>
+    <div class="group">
+      <button class="ghost-btn" id="clear" title="Rake the whole garden smooth">Clear</button>
+    </div>
+  </div>
+
+<script>
+"use strict";
+
+/* ===========================================================================
+   KARESANSUI — meditative dry-garden toy.
+   Composition layers (composed every frame onto the main canvas):
+     1. sandLayer  — base sand colour + multi-octave noise texture
+     2. litLayer   — committed grooves, lit from a height field (see below)
+     3. rocksLayer — rocks with granular texture + soft cast shadow
+   The in-progress stroke is previewed each frame from a height-field copy.
+   Grooves are NOT painted as shadow/highlight bands: the rake carves a
+   corrugation into a grey HEIGHT field and we light it per-pixel from a fixed
+   sun, so curved/over-raked grooves shade smoothly and new passes bury old.
+   =========================================================================== */
+
+const cvs = document.getElementById('garden');
+const ctx = cvs.getContext('2d');
+let DPR = Math.min(2, window.devicePixelRatio || 1);
+let W = 0, H = 0;
+
+const sandLayer    = document.createElement('canvas');
+const sandCtx      = sandLayer.getContext('2d');
+const rocksLayer   = document.createElement('canvas');
+const rocksCtx     = rocksLayer.getContext('2d');
+
+/* Groove buffers (see "GROOVES AS A LIT HEIGHT FIELD" below). Kept at CSS-pixel
+   resolution — DPR-independent — for speed; the soft upscale on composite reads
+   nicely as sand. heightLayer = surface height (grey, 128 = flat); litLayer =
+   committed lit overlay; pv* = a per-frame preview of the in-progress stroke.  */
+const heightLayer  = document.createElement('canvas');
+const heightCtx    = heightLayer.getContext('2d', { willReadFrequently: true });
+const litLayer     = document.createElement('canvas');
+const litCtx       = litLayer.getContext('2d');
+const pvHeightLayer= document.createElement('canvas');
+const pvHeightCtx  = pvHeightLayer.getContext('2d', { willReadFrequently: true });
+const pvLitLayer   = document.createElement('canvas');
+const pvLitCtx     = pvLitLayer.getContext('2d');
+const FLAT = 128;  // grey value of undisturbed sand in the height field
+
+/* ----------------------------- PRNG ----------------------------- */
+function mulberry32(seed) {
+  return function() {
+    seed |= 0; seed = (seed + 0x6D2B79F5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+const baseSeed = (Date.now() & 0xffff);
+let rng = mulberry32(baseSeed);
+
+/* ---------------------------- helpers --------------------------- */
+const dist  = (a, b) => Math.hypot(b.x - a.x, b.y - a.y);
+const lerp  = (a, b, t) => ({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t });
+const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+
+/* -------------------------- Style presets ----------------------- *
+   Each preset defines the sand, the rocks, and the groove ink. All
+   colors are RGB triplets so we can vary alpha at draw-time freely. */
+const STYLES = {
+  // A — warm cream sand, deep charcoal stones (illustrative / poster)
+  A: {
+    name: 'A — warm',
+    sand: {
+      base:    [232, 216, 184],
+      lo:      [188, 168, 128],   // tonal noise — darker
+      hi:      [248, 240, 218],   // tonal noise — lighter
+      mid:     [218, 200, 168],   // mid-tone tinting
+      vignette:[ 40,  28,  18, 0.18],
+    },
+    rocks: {
+      // Each rock is filled by sampling 'tones' randomly per pixel within its silhouette.
+      tones:   [[24, 20, 16], [38, 32, 26], [54, 46, 38], [18, 14, 10]],
+      speckle: [[110, 96, 78, 0.32], [220, 200, 170, 0.08]],
+      shadow:  [10, 6, 2, 0.36],
+    },
+    groove: {
+      shadow:  [120, 100, 64],    // a deeper warm tone of the sand itself
+      highlight:[250, 244, 226],
+      shadowAlpha: 0.34,
+      highlightAlpha: 0.32,
+    },
+  },
+  // B — pale neutral sand, mottled granite stones (photographic, weathered)
+  B: {
+    name: 'B — weathered',
+    sand: {
+      base:    [217, 211, 197],
+      lo:      [160, 152, 134],
+      hi:      [240, 236, 224],
+      mid:     [200, 192, 175],
+      vignette:[ 30,  26,  18, 0.20],
+    },
+    rocks: {
+      tones:   [[46, 44, 40], [70, 66, 60], [92, 86, 78], [30, 28, 25], [120, 112, 102]],
+      speckle: [[210, 198, 178, 0.22], [30, 28, 24, 0.20]],
+      shadow:  [16, 12, 6, 0.30],
+    },
+    groove: {
+      shadow:  [118, 110, 92],
+      highlight:[252, 248, 238],
+      shadowAlpha: 0.36,
+      highlightAlpha: 0.34,
+    },
+  },
+  // C — cool ivory sand, pale ivory stones (3D-render, soft contrast)
+  C: {
+    name: 'C — pale',
+    sand: {
+      base:    [240, 236, 226],
+      lo:      [196, 188, 172],
+      hi:      [252, 248, 240],
+      mid:     [224, 218, 204],
+      vignette:[ 60,  54,  44, 0.14],
+    },
+    rocks: {
+      tones:   [[200, 188, 168], [220, 208, 188], [180, 168, 148], [232, 222, 204]],
+      speckle: [[120, 108, 90, 0.16], [255, 250, 240, 0.20]],
+      shadow:  [40, 32, 22, 0.28],
+    },
+    groove: {
+      shadow:  [170, 158, 136],
+      highlight:[255, 253, 247],
+      shadowAlpha: 0.32,
+      highlightAlpha: 0.38,
+    },
+  },
+};
+let currentStyle = 'C';
+const STYLE = () => STYLES[currentStyle];
+
+/* ============================================================== *
+                               ROCKS
+   ============================================================== */
+let rocks = [];
+
+function makeRock(cx, cy, r, seed) {
+  // Irregular, faceted blob: more radial samples with sharper, higher-freq
+  // variation so the silhouette reads as a craggy stone with real edges.
+  const localRng = mulberry32(seed);
+  const n = 18;
+  const pts = [];
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * Math.PI * 2;
+    const noise = 0.78
+      + 0.19 * Math.sin(a * 2 + localRng() * 6.28)
+      + 0.10 * Math.sin(a * 3 + localRng() * 6.28)
+      + 0.045 * Math.sin(a * 5 + localRng() * 6.28)
+      + 0.06 * (localRng() - 0.5);
+    const rr = r * Math.max(0.58, noise);
+    pts.push({ x: cx + Math.cos(a) * rr, y: cy + Math.sin(a) * rr });
+  }
+  let maxR = 0;
+  for (const p of pts) maxR = Math.max(maxR, Math.hypot(p.x - cx, p.y - cy));
+  return { cx, cy, r, pts, maxR, rings: 0, seed };
+}
+
+function layoutRocks() {
+  rng = mulberry32(baseSeed);
+  rocks = [];
+  const margin = Math.min(W, H) * 0.18;
+  const candidates = [
+    { fx: 0.30, fy: 0.42, fr: 0.085 },
+    { fx: 0.40, fy: 0.46, fr: 0.045 },
+    { fx: 0.62, fy: 0.34, fr: 0.062 },
+    { fx: 0.72, fy: 0.62, fr: 0.075 },
+    { fx: 0.48, fy: 0.72, fr: 0.050 },
+  ];
+  const baseDim = Math.min(W, H);
+  let seed = baseSeed;
+  for (const c of candidates) {
+    const cx = c.fx * W;
+    const cy = c.fy * H;
+    const r  = c.fr * baseDim;
+    if (cx < margin || cx > W - margin || cy < margin || cy > H - margin) continue;
+    rocks.push(makeRock(cx, cy, r, seed++));
+  }
+}
+
+function smoothClosedPath(c, pts) {
+  // Catmull-Rom-ish smoothing of a closed polygon.
+  const n = pts.length;
+  const get = i => pts[((i % n) + n) % n];
+  c.moveTo((get(0).x + get(1).x) / 2, (get(0).y + get(1).y) / 2);
+  for (let i = 0; i < n; i++) {
+    const p1 = get(i);
+    const p2 = get(i + 1);
+    const m  = { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 };
+    c.quadraticCurveTo(p1.x, p1.y, m.x, m.y);
+  }
+  c.closePath();
+}
+
+/* ----------- Per-pixel rock texture ----------- *
+   We paint the rock body using ImageData: for each pixel inside the
+   rock silhouette, pick from one of `tones` weighted by a low-freq
+   noise pattern (gives variegated patches), then layer speckle dots.  */
+function paintRockTexture(ctxR, rock, palette) {
+  const r = rock.r;
+  const padding = Math.ceil(r * 1.4 + 8);
+  const bx = Math.floor(rock.cx - padding);
+  const by = Math.floor(rock.cy - padding);
+  const bw = Math.ceil(padding * 2);
+  const bh = Math.ceil(padding * 2);
+
+  // 1) Build silhouette mask in an offscreen canvas
+  const mask = document.createElement('canvas');
+  mask.width = bw; mask.height = bh;
+  const mctx = mask.getContext('2d');
+  mctx.translate(-bx, -by);
+  mctx.fillStyle = '#fff';
+  mctx.beginPath();
+  smoothClosedPath(mctx, rock.pts);
+  mctx.fill();
+  const maskData = mctx.getImageData(0, 0, bw, bh).data;
+
+  // 2) Build textured pixels using mid-frequency hash noise
+  const localRng = mulberry32(rock.seed * 9176 + 1);
+  const img = mctx.createImageData(bw, bh);
+  const data = img.data;
+  // Pre-shuffle some patch centers for low-frequency tone variation
+  const patches = [];
+  const patchCount = 6 + Math.floor(localRng() * 5);
+  for (let i = 0; i < patchCount; i++) {
+    patches.push({
+      x: (localRng() - 0.5) * 2 * r,
+      y: (localRng() - 0.5) * 2 * r,
+      r: r * (0.35 + localRng() * 0.6),
+      tone: palette.tones[Math.floor(localRng() * palette.tones.length)],
+    });
+  }
+
+  for (let y = 0; y < bh; y++) {
+    for (let x = 0; x < bw; x++) {
+      const i = (y * bw + x) * 4;
+      if (maskData[i + 3] < 8) continue; // outside silhouette
+      // Sample base tone via patch field (closest weighted)
+      const wx = x + bx - rock.cx;
+      const wy = y + by - rock.cy;
+      let rW = 0, gW = 0, bW = 0, totalW = 0;
+      for (const p of patches) {
+        const d2 = (wx - p.x) ** 2 + (wy - p.y) ** 2;
+        const w = 1 / (1 + d2 / (p.r * p.r));
+        rW += p.tone[0] * w; gW += p.tone[1] * w; bW += p.tone[2] * w;
+        totalW += w;
+      }
+      // Default toned base
+      let pr = palette.tones[0][0], pg = palette.tones[0][1], pb = palette.tones[0][2];
+      if (totalW > 0) { pr = rW / totalW; pg = gW / totalW; pb = bW / totalW; }
+      // Per-pixel grain
+      const grain = (Math.sin((wx * 12.9898 + wy * 78.233 + rock.seed) * 43758.5453 % 1 * 1000) * 0.5);
+      const grainN = ((Math.sin(wx * 1.7 + wy * 2.3 + rock.seed) + Math.cos(wx * 3.1 - wy * 1.1)) * 0.5);
+      const g = (grain + grainN) * 8; // up to ±~16
+      pr = clamp(pr + g, 0, 255);
+      pg = clamp(pg + g * 0.95, 0, 255);
+      pb = clamp(pb + g * 0.85, 0, 255);
+      // Edge falloff: darken near silhouette edge slightly (only on dark rocks helps; on pale rocks just slight)
+      const da = maskData[i + 3] / 255;
+      const edge = da < 0.6 ? (1 - (0.6 - da) * 0.6) : 1;
+      pr *= edge; pg *= edge; pb *= edge;
+      data[i] = pr;
+      data[i + 1] = pg;
+      data[i + 2] = pb;
+      data[i + 3] = maskData[i + 3];
+    }
+  }
+  // Paint the textured block onto rocksLayer at world position
+  mctx.putImageData(img, 0, 0);
+  ctxR.drawImage(mask, bx, by);
+
+  // 3) Form lighting — clipped to the rock silhouette. A broad tonal
+  //    gradient gives the rounded volume (lit upper-left → dark lower-right),
+  //    a concentrated specular catches the crown, and a deep terminator
+  //    darkens the underside so the stone reads as solid.
+  ctxR.save();
+  ctxR.beginPath();
+  smoothClosedPath(ctxR, rock.pts);
+  ctxR.clip();
+
+  // Broad volume gradient across the whole stone
+  const vol = ctxR.createLinearGradient(
+    rock.cx - r * 0.8, rock.cy - r * 0.9,
+    rock.cx + r * 0.85, rock.cy + r * 0.95
+  );
+  vol.addColorStop(0.0, 'rgba(255, 250, 236, 0.30)');
+  vol.addColorStop(0.42, 'rgba(255, 250, 236, 0.0)');
+  vol.addColorStop(0.62, 'rgba(0, 0, 0, 0.0)');
+  vol.addColorStop(1.0, 'rgba(0, 0, 0, 0.34)');
+  ctxR.fillStyle = vol;
+  ctxR.fillRect(rock.cx - r * 2, rock.cy - r * 2, r * 4, r * 4);
+
+  // Concentrated crown highlight (soft specular on the top)
+  const hl = ctxR.createRadialGradient(
+    rock.cx - r * 0.40, rock.cy - r * 0.52, r * 0.04,
+    rock.cx - r * 0.40, rock.cy - r * 0.52, r * 0.95
+  );
+  hl.addColorStop(0, 'rgba(255, 252, 240, 0.40)');
+  hl.addColorStop(0.55, 'rgba(255, 252, 240, 0.06)');
+  hl.addColorStop(1, 'rgba(255, 252, 240, 0.0)');
+  ctxR.fillStyle = hl;
+  ctxR.fillRect(rock.cx - r * 2, rock.cy - r * 2, r * 4, r * 4);
+
+  // Deep terminator / inner shadow on the shaded underside
+  const sh = ctxR.createRadialGradient(
+    rock.cx + r * 0.46, rock.cy + r * 0.56, r * 0.08,
+    rock.cx + r * 0.46, rock.cy + r * 0.56, r * 1.25
+  );
+  sh.addColorStop(0, 'rgba(0, 0, 0, 0.42)');
+  sh.addColorStop(0.6, 'rgba(0, 0, 0, 0.12)');
+  sh.addColorStop(1, 'rgba(0, 0, 0, 0.0)');
+  ctxR.fillStyle = sh;
+  ctxR.fillRect(rock.cx - r * 2, rock.cy - r * 2, r * 4, r * 4);
+
+  // 4) Speckle: dense fine mineral grain across the body
+  const speckleRng = mulberry32(rock.seed * 17 + 7);
+  const speckles = Math.floor(r * r * 1.1);
+  for (let s = 0; s < speckles; s++) {
+    // bias points toward the rock center so edges stay clean
+    const ang = speckleRng() * Math.PI * 2;
+    const rad = Math.sqrt(speckleRng()) * r * 0.98;
+    const sx = rock.cx + Math.cos(ang) * rad;
+    const sy = rock.cy + Math.sin(ang) * rad;
+    const sIdx = Math.floor(speckleRng() * palette.speckle.length);
+    const [rr, gg, bb, aa] = palette.speckle[sIdx];
+    // grains on the lit upper-left read brighter, lower-right dimmer
+    const lit = clamp(0.6 - ((sx - rock.cx) + (sy - rock.cy)) / (r * 3.2), 0.2, 1.0);
+    ctxR.fillStyle = `rgba(${rr|0},${gg|0},${bb|0},${aa * (0.35 + speckleRng() * 0.7) * lit})`;
+    const sz = 0.45 + speckleRng() * 1.1;
+    ctxR.beginPath();
+    ctxR.arc(sx, sy, sz, 0, Math.PI * 2);
+    ctxR.fill();
+  }
+  ctxR.restore();
+
+  // 5) Edge definition — crisp the silhouette so the stone reads as a hard
+  //    rock with real edges, not a soft pebble. Inner rim shadow gives the
+  //    edge thickness; a few facet cracks add craggy structure; a thin
+  //    catch-light along the upper-left rim sharpens the lit edge.
+  ctxR.save();
+  ctxR.beginPath();
+  smoothClosedPath(ctxR, rock.pts);
+  ctxR.clip();
+  ctxR.lineJoin = 'round';
+
+  // Dark inner rim on the SHADED side only — stroke an outline shifted
+  // toward the upper-left, so inside the clip only the lower-right (away
+  // from the sun) edge shows dark. The lit side keeps a clean bright edge.
+  ctxR.strokeStyle = 'rgba(0,0,0,0.30)';
+  ctxR.lineWidth = Math.max(1.4, r * 0.06);
+  ctxR.beginPath();
+  for (let i = 0; i < rock.pts.length; i++) {
+    const p = rock.pts[i];
+    const X = rock.cx + (p.x - rock.cx) - r * 0.045;
+    const Y = rock.cy + (p.y - rock.cy) - r * 0.055;
+    if (i === 0) ctxR.moveTo(X, Y); else ctxR.lineTo(X, Y);
+  }
+  ctxR.closePath();
+  ctxR.stroke();
+
+  // Facet cracks — short dark fractures across the body.
+  const crackRng = mulberry32(rock.seed * 31 + 5);
+  const cracks = 2 + Math.floor(crackRng() * 3);
+  for (let cI = 0; cI < cracks; cI++) {
+    const a0 = crackRng() * Math.PI * 2;
+    const rr0 = r * (0.15 + crackRng() * 0.45);
+    const x0 = rock.cx + Math.cos(a0) * rr0;
+    const y0 = rock.cy + Math.sin(a0) * rr0;
+    const a1 = a0 + (crackRng() - 0.5) * 1.6;
+    const len = r * (0.3 + crackRng() * 0.55);
+    const x1 = x0 + Math.cos(a1) * len;
+    const y1 = y0 + Math.sin(a1) * len;
+    // shadow side of the crack
+    ctxR.strokeStyle = 'rgba(0,0,0,0.20)';
+    ctxR.lineWidth = 1.1;
+    ctxR.beginPath(); ctxR.moveTo(x0, y0); ctxR.lineTo(x1, y1); ctxR.stroke();
+    // lit lip just above it
+    ctxR.strokeStyle = 'rgba(255,250,238,0.16)';
+    ctxR.lineWidth = 0.8;
+    ctxR.beginPath(); ctxR.moveTo(x0, y0 - 1); ctxR.lineTo(x1, y1 - 1); ctxR.stroke();
+  }
+
+  // Faint catch-light on the upper-left rim: stroke an outline shifted
+  // toward the lower-right, so inside the clip only the up-left edge shows.
+  // Kept subtle so the stone stays matte, not glossy.
+  ctxR.strokeStyle = 'rgba(255,250,236,0.26)';
+  ctxR.lineWidth = Math.max(0.8, r * 0.025);
+  ctxR.beginPath();
+  for (let i = 0; i < rock.pts.length; i++) {
+    const p = rock.pts[i];
+    const X = rock.cx + (p.x - rock.cx) + r * 0.04;
+    const Y = rock.cy + (p.y - rock.cy) + r * 0.04;
+    if (i === 0) ctxR.moveTo(X, Y); else ctxR.lineTo(X, Y);
+  }
+  ctxR.closePath();
+  ctxR.stroke();
+  ctxR.restore();
+}
+
+function paintRocks() {
+  rocksLayer.width = W * DPR;
+  rocksLayer.height = H * DPR;
+  rocksLayer.style.width  = W + 'px';
+  rocksLayer.style.height = H + 'px';
+  rocksCtx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  rocksCtx.clearRect(0, 0, W, H);
+
+  const pal = STYLE().rocks;
+
+  // First pass: a SINGLE grounded shadow per rock, so a later rock's shadow
+  // doesn't crawl over an earlier rock's body. The shadow is darkest right
+  // at the stone's base and softens outward — built from two nested layers
+  // at the SAME small down-right offset (an umbra hugging the base + a softer
+  // penumbra around it) so it reads as one shadow, never two.
+  for (const rock of rocks) {
+    const sh = pal.shadow;
+    const offX = rock.r * 0.10, offY = rock.r * 0.15;
+
+    // Penumbra — soft outer falloff
+    rocksCtx.save();
+    rocksCtx.translate(rock.cx, rock.cy);
+    rocksCtx.filter = 'blur(' + (rock.r * 0.20) + 'px)';
+    rocksCtx.fillStyle = `rgba(${sh[0]},${sh[1]},${sh[2]},${Math.min(0.55, sh[3] + 0.04)})`;
+    rocksCtx.beginPath();
+    for (let i = 0; i < rock.pts.length; i++) {
+      const p = rock.pts[i];
+      const dx = (p.x - rock.cx) * 1.05 + offX;
+      const dy = (p.y - rock.cy) * 1.05 + offY;
+      if (i === 0) rocksCtx.moveTo(dx, dy); else rocksCtx.lineTo(dx, dy);
+    }
+    rocksCtx.closePath();
+    rocksCtx.fill();
+    rocksCtx.restore();
+
+    // Umbra — dark, near-sharp core hugging the contact line. Same offset
+    // direction as the penumbra so the two merge into one continuous shadow.
+    rocksCtx.save();
+    rocksCtx.translate(rock.cx, rock.cy);
+    rocksCtx.filter = 'blur(' + Math.max(1, rock.r * 0.05) + 'px)';
+    rocksCtx.fillStyle = `rgba(${sh[0]*0.5|0},${sh[1]*0.5|0},${sh[2]*0.5|0},${Math.min(0.85, sh[3] + 0.46)})`;
+    rocksCtx.beginPath();
+    for (let i = 0; i < rock.pts.length; i++) {
+      const p = rock.pts[i];
+      const dx = (p.x - rock.cx) * 1.0 + offX * 0.7;
+      const dy = (p.y - rock.cy) * 1.0 + offY * 0.7;
+      if (i === 0) rocksCtx.moveTo(dx, dy); else rocksCtx.lineTo(dx, dy);
+    }
+    rocksCtx.closePath();
+    rocksCtx.fill();
+    rocksCtx.restore();
+  }
+  // Second pass: textured rock bodies
+  for (const rock of rocks) {
+    paintRockTexture(rocksCtx, rock, pal);
+  }
+}
+
+/* ============================================================== *
+                              SAND
+   ============================================================== */
+function paintSand() {
+  sandLayer.width = W * DPR;
+  sandLayer.height = H * DPR;
+  sandLayer.style.width  = W + 'px';
+  sandLayer.style.height = H + 'px';
+  sandCtx.setTransform(DPR, 0, 0, DPR, 0, 0);
+
+  const s = STYLE().sand;
+
+  // Base — slightly uneven across the canvas (gentle radial tint)
+  const grd = sandCtx.createRadialGradient(W * 0.45, H * 0.4, Math.min(W,H) * 0.1, W * 0.5, H * 0.5, Math.max(W,H) * 0.85);
+  grd.addColorStop(0, `rgb(${s.hi[0]},${s.hi[1]},${s.hi[2]})`);
+  grd.addColorStop(0.55, `rgb(${s.base[0]},${s.base[1]},${s.base[2]})`);
+  grd.addColorStop(1, `rgb(${s.mid[0]},${s.mid[1]},${s.mid[2]})`);
+  sandCtx.fillStyle = grd;
+  sandCtx.fillRect(0, 0, W, H);
+
+  // -- Multi-octave grain via pixel manipulation. --
+  // We work on a downsampled buffer (perf) then scale up — keeps grain
+  // chunky enough to read as "sand" rather than digital noise.
+  const scale = 0.6;
+  const gw = Math.max(2, Math.floor(W * scale));
+  const gh = Math.max(2, Math.floor(H * scale));
+  const grainCanvas = document.createElement('canvas');
+  grainCanvas.width = gw; grainCanvas.height = gh;
+  const gctx = grainCanvas.getContext('2d');
+  // initialize transparent base
+  const img = gctx.createImageData(gw, gh);
+  const data = img.data;
+  const rngG = mulberry32(baseSeed ^ 0xA3B1);
+  for (let y = 0; y < gh; y++) {
+    for (let x = 0; x < gw; x++) {
+      const i = (y * gw + x) * 4;
+      // multi-octave value noise via hashing
+      const f1 = Math.sin(x * 0.27 + y * 0.61 + rngG() * 100) * 0.5 + 0.5;
+      const f2 = Math.sin(x * 1.13 + y * 0.83 + 1.7) * 0.5 + 0.5;
+      const f3 = Math.sin(x * 2.4  + y * 1.9  + 2.3) * 0.5 + 0.5;
+      const r1 = ((Math.sin(x * 12.9898 + y * 78.233) * 43758.5453) % 1 + 1) % 1;
+      // Combine: bias toward midtone, with sometimes brighter/darker
+      let n = 0.30 * f1 + 0.25 * f2 + 0.20 * f3 + 0.25 * r1;
+      n = (n - 0.5) * 1.6; // re-center, slight contrast
+      // Map n in [-0.8..0.8] to a tone between lo and hi
+      const t = clamp(0.5 + n * 0.5, 0, 1);
+      const cr = s.lo[0] * (1 - t) + s.hi[0] * t;
+      const cg = s.lo[1] * (1 - t) + s.hi[1] * t;
+      const cb = s.lo[2] * (1 - t) + s.hi[2] * t;
+      data[i] = cr;
+      data[i + 1] = cg;
+      data[i + 2] = cb;
+      data[i + 3] = 110; // alpha — grain mixes with base by partial overlay
+    }
+  }
+  gctx.putImageData(img, 0, 0);
+  // Slight smoothing — sand grain isn't pixel-perfect
+  sandCtx.save();
+  sandCtx.globalAlpha = 0.95;
+  sandCtx.imageSmoothingEnabled = true;
+  sandCtx.imageSmoothingQuality = 'high';
+  sandCtx.drawImage(grainCanvas, 0, 0, W, H);
+  sandCtx.restore();
+
+  // Fine high-frequency speckle on top — sharp sand grains
+  const fineN = Math.floor(W * H / 90);
+  const rngF = mulberry32(baseSeed ^ 0xC7);
+  for (let i = 0; i < fineN; i++) {
+    const x = rngF() * W, y = rngF() * H;
+    const v = rngF();
+    if (v < 0.5) {
+      sandCtx.fillStyle = `rgba(${s.lo[0]},${s.lo[1]},${s.lo[2]},${0.10 + rngF() * 0.18})`;
+    } else {
+      sandCtx.fillStyle = `rgba(${s.hi[0]},${s.hi[1]},${s.hi[2]},${0.10 + rngF() * 0.20})`;
+    }
+    const sz = rngF() < 0.85 ? 1 : 2;
+    sandCtx.fillRect(x, y, sz, sz);
+  }
+
+  // Vignette
+  const vg = sandCtx.createRadialGradient(W/2, H/2, Math.min(W,H) * 0.35, W/2, H/2, Math.max(W,H) * 0.80);
+  vg.addColorStop(0, 'rgba(0,0,0,0)');
+  vg.addColorStop(1, `rgba(${s.vignette[0]},${s.vignette[1]},${s.vignette[2]},${s.vignette[3]})`);
+  sandCtx.fillStyle = vg;
+  sandCtx.fillRect(0, 0, W, H);
+}
+
+/* ============================================================== *
+                            STROKES
+   ============================================================== */
+let activeStroke = null;
+let liveStroke = null;        // user's in-progress drag, rendered live
+let strokeQueue = [];
+let teeth = 5;
+let paceMultiplier = 2.6;  // Calm (default). Updated by the Pace controls.
+const PACE_MAP = { slow: 3.8, calm: 2.6, brisk: 1.4 };
+const TOOTH_SPACING = 9;
+const RAKE_PAD = 5;
+
+function rakeHalfWidth(t = teeth) {
+  return ((t - 1) * TOOTH_SPACING) / 2 + RAKE_PAD;
+}
+
+function resamplePath(pts, step) {
+  if (pts.length < 2) return pts.slice();
+  const out = [pts[0]];
+  let prev = pts[0];
+  let acc = 0;
+  for (let i = 1; i < pts.length; i++) {
+    let next = pts[i];
+    let seg = dist(prev, next);
+    while (acc + seg >= step) {
+      const t = (step - acc) / seg;
+      const p = lerp(prev, next, t);
+      out.push(p);
+      prev = p;
+      seg = dist(prev, next);
+      acc = 0;
+    }
+    acc += seg;
+    prev = next;
+  }
+  out.push(pts[pts.length - 1]);
+  return out;
+}
+
+function computePerps(pts) {
+  const n = pts.length;
+  const perps = new Array(n);
+  for (let i = 0; i < n; i++) {
+    const a = pts[Math.max(0, i - 1)];
+    const b = pts[Math.min(n - 1, i + 1)];
+    let dx = b.x - a.x, dy = b.y - a.y;
+    const m = Math.hypot(dx, dy) || 1;
+    dx /= m; dy /= m;
+    perps[i] = { x: -dy, y: dx };
+  }
+  return perps;
+}
+
+function pathLength(pts) {
+  let L = 0;
+  for (let i = 1; i < pts.length; i++) L += dist(pts[i-1], pts[i]);
+  return L;
+}
+
+function prefixOfPath(pts, len) {
+  if (len <= 0) return [pts[0]];
+  let acc = 0;
+  const out = [pts[0]];
+  for (let i = 1; i < pts.length; i++) {
+    const seg = dist(pts[i-1], pts[i]);
+    if (acc + seg < len) {
+      acc += seg;
+      out.push(pts[i]);
+    } else {
+      const t = (len - acc) / seg;
+      out.push(lerp(pts[i-1], pts[i], t));
+      return out;
+    }
+  }
+  return out;
+}
+
+function deflectAroundRocks(pts, halfW) {
+  const margin = halfW + 4;
+  const deflected = pts.map(p => ({ x: p.x, y: p.y }));
+  for (let iter = 0; iter < 3; iter++) {
+    for (let i = 0; i < deflected.length; i++) {
+      for (const rock of rocks) {
+        const dx = deflected[i].x - rock.cx;
+        const dy = deflected[i].y - rock.cy;
+        const d = Math.hypot(dx, dy) || 0.0001;
+        const minD = rock.maxR + margin;
+        if (d < minD) {
+          const push = (minD - d);
+          deflected[i].x += (dx / d) * push;
+          deflected[i].y += (dy / d) * push;
+        }
+      }
+    }
+    for (let i = 1; i < deflected.length - 1; i++) {
+      deflected[i].x = (deflected[i-1].x + 2 * deflected[i].x + deflected[i+1].x) / 4;
+      deflected[i].y = (deflected[i-1].y + 2 * deflected[i].y + deflected[i+1].y) / 4;
+    }
+  }
+  return deflected;
+}
+
+/* ----- Freehand smoothing -----
+   The rake follows the user's drag faithfully. We only do a light
+   smoothing pass to absorb finger/pointer jitter — no snap-to-cardinal,
+   no curve-fitting. What you draw is what gets raked.                */
+function smoothFreehand(rawPts) {
+  if (rawPts.length < 3) return rawPts.map(p => ({ x: p.x, y: p.y }));
+  // Resample at ~5px to remove tiny dense clusters from fast pointermove bursts.
+  let pts = resamplePath(rawPts.map(p => ({ x: p.x, y: p.y })), 5);
+  // 3 passes of Laplacian smoothing — gentle, preserves shape.
+  for (let iter = 0; iter < 3; iter++) {
+    const next = pts.map(p => ({ x: p.x, y: p.y }));
+    for (let i = 1; i < pts.length - 1; i++) {
+      next[i].x = (pts[i-1].x + 2 * pts[i].x + pts[i+1].x) / 4;
+      next[i].y = (pts[i-1].y + 2 * pts[i].y + pts[i+1].y) / 4;
+    }
+    pts = next;
+  }
+  return pts;
+}
+
+/* ----- Release velocity (px per ms) over last ~120ms ----- */
+function computeReleaseVelocity(rawPts) {
+  if (!rawPts || rawPts.length < 2) return { vx: 0, vy: 0, speed: 0 };
+  const last = rawPts[rawPts.length - 1];
+  if (last.t == null) return { vx: 0, vy: 0, speed: 0 };
+  const windowMs = 120;
+  let i = rawPts.length - 2;
+  while (i > 0 && (last.t - rawPts[i].t) < windowMs) i--;
+  const ref = rawPts[i];
+  const dt = Math.max(1, last.t - ref.t);
+  const dx = last.x - ref.x;
+  const dy = last.y - ref.y;
+  return { vx: dx / dt, vy: dy / dt, speed: Math.hypot(dx, dy) / dt };
+}
+
+/* ----- Extend a point past the canvas edge in a direction ----- */
+function extendToEdge(start, vx, vy) {
+  const mag = Math.hypot(vx, vy);
+  if (mag < 1e-6) return null;
+  const dx = vx / mag, dy = vy / mag;
+  let tMin = Infinity;
+  if (dx > 1e-6)       tMin = Math.min(tMin, (W - start.x) / dx);
+  else if (dx < -1e-6) tMin = Math.min(tMin, (0 - start.x) / dx);
+  if (dy > 1e-6)       tMin = Math.min(tMin, (H - start.y) / dy);
+  else if (dy < -1e-6) tMin = Math.min(tMin, (0 - start.y) / dy);
+  if (!isFinite(tMin) || tMin <= 0) return null;
+  return { x: start.x + dx * tMin, y: start.y + dy * tMin };
+}
+
+function makeStroke(rawPath, opts = {}) {
+  const t = opts.teeth || teeth;
+  const halfW = rakeHalfWidth(t);
+  let path = opts.preSmoothed ? rawPath : smoothFreehand(rawPath);
+  path = resamplePath(path, 4);
+  if (!opts.skipDeflect) {
+    path = deflectAroundRocks(path, halfW);
+    path = resamplePath(path, 4);
+  }
+  const L = pathLength(path);
+  // Base draw time. Multiplied by the user's chosen pace, plus a teeth
+  // factor — a wider rake is heavier, so a careful monk moves it slower.
+  const baseDuration = clamp(1400 + L * 4.4, 1600, 4800);
+  const teethFactor = 0.85 + (t - 1) * 0.11;  // 1 tooth: 0.85x, 5: 1.29x, 9: 1.73x
+  const duration = baseDuration * paceMultiplier * teethFactor;
+  return {
+    path,
+    teeth: t,
+    length: L,
+    elapsed: 0,
+    duration,
+    closed: !!opts.closed,
+    trimStart: opts.trimStart !== false,
+    trimEnd: opts.trimEnd !== false,
+  };
+}
+
+/* ===========================================================================
+   GROOVES AS A LIT HEIGHT FIELD
+   ===========================================================================
+   We stopped painting shadow + highlight strips by hand. Instead the sand is
+   a real HEIGHT FIELD: the rake carves a corrugation (parallel valleys &
+   ridges) into a grey buffer, and a separate pass LIGHTS that buffer per
+   pixel from a fixed sun. Every pixel's brightness comes from the actual
+   surface slope, so:
+     • shading glides smoothly around curves & rings (no side-flipping),
+     • crossings just work — a newer pass overwrites the height of an older
+       one, so new sand genuinely buries old marks,
+     • it matches real sunlight/shadow because it IS a lighting model.
+   carveStroke() stamps the corrugation; lightRegion() lights a rectangle.   */
+
+function normalize3(x, y, z) {
+  const m = Math.hypot(x, y, z) || 1;
+  return [x / m, y / m, z / m];
+}
+
+const GROOVE = {
+  amp: 60,                                  // height swing (grey units), valley↔ridge
+  slopeScale: 0.019,                        // grey-gradient → surface tilt
+  light: normalize3(-0.58, -0.62, 0.53),    // sun: upper-left, fairly low
+  maxShadow: 0.40,
+  maxHi: 0.42,
+  gain: 1.0,
+};
+
+/* Bounding box (CSS px) covering a stroke prefix's full rake footprint. */
+function clampBox(box) {
+  const x = Math.max(0, Math.floor(box.x));
+  const y = Math.max(0, Math.floor(box.y));
+  const w = Math.min(W - x, Math.ceil(box.x + box.w) - x);
+  const h = Math.min(H - y, Math.ceil(box.y + box.h) - y);
+  if (w <= 0 || h <= 0) return null;
+  return { x, y, w, h };
+}
+
+/* Stamp one stroke's corrugation into a height context (opaque, so a newer
+   pass buries an older one). `progress` reveals it along the path. Returns
+   the affected bounding box so the caller can re-light just that region.    */
+function carveStroke(hctx, stroke, progress, opts = {}) {
+  if (stroke.path.length < 2) return null;
+  const visibleLen = stroke.length * Math.max(progress, 0);
+  const sub = prefixOfPath(stroke.path, Math.max(visibleLen, 1));
+  if (sub.length < 2) return null;
+  // Only close the loop once the ring is FULLY revealed. While a closed ring
+  // animates we draw a prefix arc — closing it then would bridge the open gap
+  // with a straight chord at every cross-offset (a fan across the wedge).
+  const full = visibleLen >= stroke.length - 0.5;
+  const perps = computePerps(sub);
+  const N = sub.length;
+  const spacing = TOOTH_SPACING;
+  const halfBand = ((stroke.teeth - 1) / 2) * spacing + spacing * 0.5; // to crest
+  const edgeTaper = spacing * 0.95;                                    // flat margin
+  const reach = halfBand + edgeTaper;
+
+  hctx.save();
+  hctx.lineCap = 'round';
+  hctx.lineJoin = 'round';
+
+  // One opaque grey polyline per cross-offset; grey encodes height. Because
+  // a furrow keeps the same depth along its whole length, each polyline is a
+  // single colour — fast, and the per-offset cosine makes a smooth gradient.
+  const step = 1.0;
+  const lw = step * 1.9;
+  for (let c = -reach; c <= reach; c += step) {
+    const ac = Math.abs(c);
+    let h = -GROOVE.amp * Math.cos((2 * Math.PI * c) / spacing);
+    if (ac > halfBand) {
+      const t = clamp(1 - (ac - halfBand) / edgeTaper, 0, 1);
+      h *= t * t * (3 - 2 * t);            // ease the last ridge down to flat
+    }
+    const grey = clamp(Math.round(FLAT + h), 0, 255);
+    hctx.strokeStyle = `rgb(${grey},${grey},${grey})`;
+    hctx.lineWidth = lw;
+    hctx.beginPath();
+    hctx.moveTo(sub[0].x + perps[0].x * c, sub[0].y + perps[0].y * c);
+    for (let i = 1; i < N; i++) {
+      hctx.lineTo(sub[i].x + perps[i].x * c, sub[i].y + perps[i].y * c);
+    }
+    if (stroke.closed && full) hctx.closePath();
+    hctx.stroke();
+  }
+
+  // Lay-down / lift-off: ease the corrugation back to flat at open ends, so
+  // the rake doesn't start or stop with a hard wall of sand.
+  if (!stroke.closed) {
+    const trimStart = opts.trimStart !== undefined ? opts.trimStart : (stroke.trimStart !== false);
+    const trimEnd   = opts.trimEnd   !== undefined ? opts.trimEnd   : (stroke.trimEnd   !== false);
+    const fade = spacing * 1.4;
+    const cap = (tipIdx, dirIdx) => {
+      const tip = sub[tipIdx], ref = sub[dirIdx];
+      const ang = Math.atan2(ref.y - tip.y, ref.x - tip.x);
+      hctx.save();
+      hctx.translate(tip.x, tip.y);
+      hctx.rotate(ang);
+      const g = hctx.createLinearGradient(0, 0, fade, 0);
+      g.addColorStop(0, `rgba(${FLAT},${FLAT},${FLAT},1)`);
+      g.addColorStop(1, `rgba(${FLAT},${FLAT},${FLAT},0)`);
+      hctx.fillStyle = g;
+      hctx.fillRect(-3, -reach - 2, fade + 3, (reach + 2) * 2);
+      hctx.restore();
+    };
+    if (trimStart) cap(0, Math.min(N - 1, 4));
+    if (trimEnd)   cap(N - 1, Math.max(0, N - 5));
+  }
+  hctx.restore();
+
+  // bounding box
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const p of sub) {
+    if (p.x < minX) minX = p.x; if (p.x > maxX) maxX = p.x;
+    if (p.y < minY) minY = p.y; if (p.y > maxY) maxY = p.y;
+  }
+  const pad = reach + 3;
+  return { x: minX - pad, y: minY - pad, w: (maxX - minX) + pad * 2, h: (maxY - minY) + pad * 2 };
+}
+
+/* Light a rectangle of the height buffer into an RGBA overlay (drawn over the
+   sand). Brightness = surface-normal · sun; we store only the DELTA from flat
+   sand, as a translucent shadow (dark) or highlight (light) tint — so the sand
+   texture shows through everywhere the rake hasn't been. putImageData replaces
+   the region outright, which is exactly the re-light we want.                */
+function lightRegion(srcCtx, dstCtx, box) {
+  const b = clampBox(box);
+  if (!b || b.w <= 2 || b.h <= 2) return;
+  const { x, y, w, h } = b;
+  const src = srcCtx.getImageData(x, y, w, h).data;
+  const out = dstCtx.createImageData(w, h);
+  const o = out.data;
+  const L = GROOVE.light, flatB = L[2], ss = GROOVE.slopeScale, gain = GROOVE.gain;
+  const gr = STYLE().groove;
+  const sh = gr.shadow, hi = gr.highlight;
+  const maxS = GROOVE.maxShadow, maxH = GROOVE.maxHi;
+  const row = w * 4;
+  for (let j = 0; j < h; j++) {
+    for (let i = 0; i < w; i++) {
+      const idx = (j * w + i) * 4;
+      const xm = i > 0 ? src[idx - 4] : src[idx];
+      const xp = i < w - 1 ? src[idx + 4] : src[idx];
+      const ym = j > 0 ? src[idx - row] : src[idx];
+      const yp = j < h - 1 ? src[idx + row] : src[idx];
+      const sx = (xp - xm) * 0.5 * ss;
+      const sy = (yp - ym) * 0.5 * ss;
+      const inv = 1 / Math.sqrt(sx * sx + sy * sy + 1);
+      const bright = (-sx * L[0] - sy * L[1] + L[2]) * inv;  // N·L
+      let d = (bright - flatB) * gain;
+      if (d < 0) {
+        const a = d < -maxS ? maxS : -d;
+        o[idx] = sh[0]; o[idx + 1] = sh[1]; o[idx + 2] = sh[2]; o[idx + 3] = (a * 255) | 0;
+      } else if (d > 0) {
+        const a = d > maxH ? maxH : d;
+        o[idx] = hi[0]; o[idx + 1] = hi[1]; o[idx + 2] = hi[2]; o[idx + 3] = (a * 255) | 0;
+      } else {
+        o[idx + 3] = 0;
+      }
+    }
+  }
+  dstCtx.putImageData(out, x, y);
+}
+
+/* Commit a stroke permanently: carve into the shared height field, then
+   re-light the affected region into the committed overlay. */
+function commitStroke(stroke, progress = 1) {
+  const box = carveStroke(heightCtx, stroke, progress);
+  if (box) lightRegion(heightCtx, litCtx, box);
+}
+
+/* Re-light the entire committed height field (used when the style changes). */
+function relightAll() {
+  litCtx.clearRect(0, 0, W, H);
+  lightRegion(heightCtx, litCtx, { x: 0, y: 0, w: W, h: H });
+}
+
+/* ============================================================== *
+                       STROKE FACTORIES
+   ============================================================== */
+/* ----- A monk's rake around a stone glides smoothly past concave parts
+   of the silhouette rather than poking into them. We model that by
+   heavily low-pass-filtering the rock's radial signal r(θ) BEFORE
+   building the ring path. A smoothed radial profile is by construction
+   star-shaped (no self-intersection possible), and because curvature
+   stays low the perpendicular distance between adjacent rings is
+   effectively equal to the radial spacing.
+
+   The unsmoothed silhouette would cause self-intersection loops at
+   concavities when offset along normals — those showed up as tiny
+   curls at the rock's corners. Smoothing first eliminates them. */
+function makeRockRingPath(rock, offsetDist) {
+  const n = 192;
+  // 1) Sample radii at uniform angles.
+  let radii = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * Math.PI * 2;
+    radii[i] = rockRadiusAtAngle(rock, a);
+  }
+  // 2) Heavy circular smoothing of the 1D radial signal — 8 passes of
+  //    a 5-tap box filter. This rounds out concavities so a rake's
+  //    path glides past them smoothly.
+  let buf = new Float32Array(n);
+  for (let pass = 0; pass < 8; pass++) {
+    for (let i = 0; i < n; i++) {
+      buf[i] = (
+        radii[(i - 2 + n) % n] +
+        radii[(i - 1 + n) % n] +
+        radii[i] +
+        radii[(i + 1) % n] +
+        radii[(i + 2) % n]
+      ) * 0.2;
+    }
+    [radii, buf] = [buf, radii];
+  }
+  // 3) Ensure the smoothed profile stays at or outside the actual rock
+  //    silhouette — smoothing can pull radii slightly inward at sharp
+  //    convex bumps, and we never want a ring drawn underneath the rock.
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * Math.PI * 2;
+    const trueR = rockRadiusAtAngle(rock, a);
+    if (radii[i] < trueR) radii[i] = trueR;
+  }
+  // 4) Build the ring path at smoothed_radius + offset along each angle.
+  const out = new Array(n + 1);
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * Math.PI * 2;
+    const rr = radii[i] + offsetDist;
+    out[i] = {
+      x: rock.cx + Math.cos(a) * rr,
+      y: rock.cy + Math.sin(a) * rr,
+    };
+  }
+  out[n] = { x: out[0].x, y: out[0].y };
+  return out;
+}
+function rockRadiusAtAngle(rock, angle) {
+  const n = rock.pts.length;
+  let a = ((angle % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+  const fIdx = (a / (Math.PI * 2)) * n;
+  const i0 = Math.floor(fIdx) % n;
+  const i1 = (i0 + 1) % n;
+  const t = fIdx - Math.floor(fIdx);
+  const p0 = rock.pts[i0], p1 = rock.pts[i1];
+  const r0 = Math.hypot(p0.x - rock.cx, p0.y - rock.cy);
+  const r1 = Math.hypot(p1.x - rock.cx, p1.y - rock.cy);
+  return r0 * (1 - t) + r1 * t;
+}
+function makeSandCirclePath(cx, cy, radius) {
+  const n = 80;
+  const pts = [];
+  for (let i = 0; i <= n; i++) {
+    const a = (i / n) * Math.PI * 2;
+    pts.push({ x: cx + Math.cos(a) * radius, y: cy + Math.sin(a) * radius });
+  }
+  return pts;
+}
+
+/* ----------- Tap target detection ----------- */
+function pointInRock(p, rock) {
+  let inside = false;
+  const pts = rock.pts;
+  for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+    const xi = pts[i].x, yi = pts[i].y;
+    const xj = pts[j].x, yj = pts[j].y;
+    const intersect = ((yi > p.y) !== (yj > p.y)) &&
+      (p.x < (xj - xi) * (p.y - yi) / (yj - yi + 0.00001) + xi);
+    if (intersect) inside = !inside;
+  }
+  return inside;
+}
+function rockHit(p) {
+  for (const rock of rocks) {
+    if (pointInRock(p, rock)) return rock;
+    const d = Math.hypot(p.x - rock.cx, p.y - rock.cy);
+    if (d < rock.maxR + 6) return rock;
+  }
+  return null;
+}
+
+function enqueueStroke(stroke) {
+  if (activeStroke) {
+    strokeQueue.push(stroke);
+    if (strokeQueue.length > 5) strokeQueue.length = 5;
+  } else {
+    activeStroke = stroke;
+  }
+}
+
+let lastTapCenter = null;
+function tapAt(p) {
+  const rock = rockHit(p);
+  const halfW = rakeHalfWidth();
+  if (rock) {
+    rock.rings = (rock.rings || 0) + 1;
+    const baseOffset = halfW + 6;
+    const ringSpacing = halfW * 2 + 4;
+    const offset = baseOffset + (rock.rings - 1) * ringSpacing;
+    const path = makeRockRingPath(rock, offset);
+    enqueueStroke(makeStroke(path, { preSmoothed: true, skipDeflect: true, closed: true }));
+  } else {
+    let center = lastTapCenter;
+    if (!center || Math.hypot(center.x - p.x, center.y - p.y) > 28) {
+      center = { x: p.x, y: p.y, rings: 0 };
+      lastTapCenter = center;
+    }
+    center.rings++;
+    const baseR = 32;
+    const step = halfW * 2 + 4;
+    const r = baseR + (center.rings - 1) * step;
+    const path = makeSandCirclePath(center.x, center.y, r);
+    enqueueStroke(makeStroke(path, { preSmoothed: true, closed: true }));
+  }
+}
+
+function dragEnd() { /* legacy — superseded by finalizeLiveStroke */ }
+
+function finalizeLiveStroke() {
+  if (!liveStroke || liveStroke.path.length < 2) { liveStroke = null; return; }
+
+  // Resample for clean rendering. The path is already lightly smoothed
+  // by the per-move EMA; one resample is enough.
+  const rawPath = liveStroke.path.map(p => ({ x: p.x, y: p.y }));
+  const sampled = resamplePath(rawPath, 4);
+  if (sampled.length < 2) { liveStroke = null; return; }
+
+  // Straightness ratio — chord vs traveled path. A near-straight drag
+  // is read as "rake this line", and we continue it to the canvas edge.
+  const chord = dist(sampled[0], sampled[sampled.length - 1]);
+  const travel = pathLength(sampled);
+  const straightness = chord / Math.max(travel, 1);
+
+  // Release velocity over the last ~120ms of raw points.
+  const v = computeReleaseVelocity(dragPts);
+
+  // Fling-to-edge fires when the drag was mostly straight AND the user
+  // released with some momentum. A curved hand-drawn shape doesn't extend.
+  const shouldExtend = straightness > 0.86 && v.speed > 0.18;
+
+  // Build the committed drag stroke.
+  const dragStroke = {
+    path: sampled,
+    teeth: teeth,
+    length: travel,
+    closed: false,
+    trimStart: true,
+    trimEnd: !shouldExtend,
+  };
+  commitStroke(dragStroke, 1);
+  liveStroke = null;
+
+  if (shouldExtend) {
+    const last = sampled[sampled.length - 1];
+    const edge = extendToEdge(last, v.vx, v.vy);
+    if (edge) {
+      // Animated extension stroke from release point to canvas edge,
+      // continuing the user's release direction.
+      const ext = makeStroke([last, edge], {
+        teeth: teeth,
+        // No smoothing/snapping needed; it's a straight line.
+        trimStart: false,
+        trimEnd: true,
+      });
+      // Override duration so it animates at the user's release speed,
+      // not the global pace — it should feel like physical inertia.
+      const extDist = pathLength(ext.path);
+      const speedPxMs = Math.max(0.18, v.speed);
+      ext.duration = clamp(extDist / speedPxMs, 600, 5500);
+      activeStroke = ext;
+    }
+  }
+}
+
+/* ============================================================== *
+                          ANIMATION
+   ============================================================== */
+let lastT = performance.now();
+let lastUserActivity = performance.now();
+const IDLE_FADE_MS = 4500;
+
+function easeInOutCubic(t) {
+  return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+}
+
+function frame(now) {
+  const dt = Math.min(64, now - lastT);
+  lastT = now;
+
+  // Controls visibility is driven by cursor position (see below); here we
+  // only fade the corner mark when the user has been idle.
+  if (now - lastUserActivity > IDLE_FADE_MS) {
+    markEl.classList.add('idle');
+  } else {
+    markEl.classList.remove('idle');
+  }
+
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.clearRect(0, 0, W, H);
+  ctx.drawImage(sandLayer, 0, 0, W, H);
+  ctx.drawImage(litLayer, 0, 0, W, H);            // committed grooves (lit)
+
+  // Advance / preview the single in-progress stroke (animating OR live drag).
+  let eased = 1, finished = false;
+  if (activeStroke) {
+    activeStroke.elapsed += dt;
+    const p = clamp(activeStroke.elapsed / activeStroke.duration, 0, 1);
+    eased = activeStroke.closed ? p : easeInOutCubic(p);
+    finished = p >= 1;
+  }
+  const pv = activeStroke || (liveStroke && liveStroke.path.length >= 2 ? liveStroke : null);
+  if (pv) {
+    // Build a preview height = committed field + this stroke on top, light just
+    // its footprint, then paint sand+overlay there (so it covers committed
+    // grooves within the footprint — new buries old, even mid-animation).
+    pvHeightCtx.clearRect(0, 0, W, H);
+    pvHeightCtx.drawImage(heightLayer, 0, 0);
+    const opts = pv === liveStroke ? { trimStart: true, trimEnd: false } : {};
+    const box = carveStroke(pvHeightCtx, pv, activeStroke ? eased : 1, opts);
+    const b = box && clampBox(box);
+    if (b) {
+      lightRegion(pvHeightCtx, pvLitCtx, b);
+      ctx.drawImage(sandLayer, b.x * DPR, b.y * DPR, b.w * DPR, b.h * DPR, b.x, b.y, b.w, b.h);
+      ctx.drawImage(pvLitLayer, b.x, b.y, b.w, b.h, b.x, b.y, b.w, b.h);
+    }
+    if (finished) {
+      commitStroke(activeStroke);
+      activeStroke = strokeQueue.shift() || null;
+    }
+  } else if (ambientOn && !isUserInput) {
+    ambientAccumMs += dt;
+    const stillFor = now - lastUserActivity;
+    if (stillFor > 1800 && ambientAccumMs > ambientGapMs && rocks.length > 0) {
+      ambientAccumMs = 0;
+      ambientGapMs = 300 + Math.random() * 1200;
+      scheduleAmbientStroke();
+    }
+  }
+
+  ctx.drawImage(rocksLayer, 0, 0, W, H);
+
+  requestAnimationFrame(frame);
+}
+
+/* ============================================================== *
+                          AMBIENT MODE
+   ============================================================== */
+let ambientOn = false;
+let ambientAccumMs = 0;
+let ambientGapMs = 1500;
+
+function scheduleAmbientStroke() {
+  const kind = Math.random();
+  if (kind < 0.4) {
+    const rock = rocks[Math.floor(Math.random() * rocks.length)];
+    rock.rings = (rock.rings || 0) + 1;
+    const halfW = rakeHalfWidth();
+    const baseOffset = halfW + 6;
+    const ringSpacing = halfW * 2 + 4;
+    const offset = baseOffset + (rock.rings - 1) * ringSpacing;
+    const path = makeRockRingPath(rock, offset);
+    enqueueStroke(makeStroke(path, { preSmoothed: true, skipDeflect: true, closed: true }));
+  } else if (kind < 0.65) {
+    const cx = (0.2 + Math.random() * 0.6) * W;
+    const cy = (0.2 + Math.random() * 0.6) * H;
+    const center = { x: cx, y: cy, rings: 1 };
+    lastTapCenter = center;
+    const halfW = rakeHalfWidth();
+    const r = 32 + Math.floor(Math.random() * 3) * (halfW * 2 + 4);
+    const path = makeSandCirclePath(cx, cy, r);
+    enqueueStroke(makeStroke(path, { preSmoothed: true, closed: true }));
+  } else {
+    const horizontal = Math.random() < 0.6;
+    let start, end, mid;
+    if (horizontal) {
+      const y = (0.15 + Math.random() * 0.7) * H;
+      start = { x: W * 0.08, y };
+      end   = { x: W * 0.92, y };
+    } else {
+      const x = (0.15 + Math.random() * 0.7) * W;
+      start = { x, y: H * 0.08 };
+      end   = { x, y: H * 0.92 };
+    }
+    mid = {
+      x: (start.x + end.x) / 2 + (Math.random() - 0.5) * Math.min(W, H) * 0.18,
+      y: (start.y + end.y) / 2 + (Math.random() - 0.5) * Math.min(W, H) * 0.18,
+    };
+    enqueueStroke(makeStroke([start, mid, end]));
+  }
+}
+
+/* ============================================================== *
+                             INPUT
+   ============================================================== */
+const controlsEl = document.getElementById('controls');
+const markEl     = document.getElementById('mark');
+const teethVal   = document.getElementById('t-val');
+
+let isUserInput = false;
+let pointerDown = false;
+let dragPts = [];
+let dragStartTime = 0;
+
+function markActivity() {
+  lastUserActivity = performance.now();
+  ambientAccumMs = 0;
+}
+
+function pointerPos(e) {
+  const r = cvs.getBoundingClientRect();
+  return { x: e.clientX - r.left, y: e.clientY - r.top };
+}
+
+cvs.addEventListener('pointerdown', (e) => {
+  // Any user drag immediately takes over the canvas: commit whatever
+  // the active stroke has drawn so far and clear the queue, so the new
+  // live stroke renders without competing with old animations.
+  if (activeStroke) {
+    const p = clamp(activeStroke.elapsed / activeStroke.duration, 0, 1);
+    const eased = activeStroke.closed ? p : easeInOutCubic(p);
+    commitStroke(activeStroke, eased);
+    activeStroke = null;
+  }
+  strokeQueue.length = 0;
+
+  cvs.setPointerCapture(e.pointerId);
+  pointerDown = true;
+  isUserInput = true;
+  const now = performance.now();
+  const p0 = pointerPos(e);
+  p0.t = now;
+  dragPts = [p0];
+  dragStartTime = now;
+  liveStroke = {
+    path: [{ x: p0.x, y: p0.y }],
+    teeth: teeth,
+    length: 0,
+    closed: false,
+    elapsed: 0, duration: 1,
+  };
+  markActivity();
+});
+cvs.addEventListener('pointermove', (e) => {
+  if (!pointerDown) return;
+  const p = pointerPos(e);
+  p.t = performance.now();
+  const last = dragPts[dragPts.length - 1];
+  if (!last || Math.hypot(p.x - last.x, p.y - last.y) > 2) {
+    dragPts.push(p);
+    if (liveStroke) {
+      // Light incremental smoothing — average each new point with the
+      // previous one to absorb pointer jitter while keeping live
+      // feedback responsive (no lag chain).
+      const prev = liveStroke.path[liveStroke.path.length - 1];
+      liveStroke.path.push({
+        x: prev.x * 0.25 + p.x * 0.75,
+        y: prev.y * 0.25 + p.y * 0.75,
+      });
+      liveStroke.length = pathLength(liveStroke.path);
+    }
+  }
+  markActivity();
+});
+cvs.addEventListener('pointerup', (e) => {
+  if (!pointerDown) return;
+  pointerDown = false;
+  isUserInput = false;
+  const dt = performance.now() - dragStartTime;
+  const travel = pathLength(dragPts);
+  if (travel < 10 && dt < 350) {
+    liveStroke = null;
+    tapAt(dragPts[dragPts.length - 1]);
+  } else {
+    finalizeLiveStroke();
+  }
+  dragPts = [];
+  markActivity();
+});
+cvs.addEventListener('pointercancel', () => {
+  pointerDown = false;
+  isUserInput = false;
+  dragPts = [];
+  liveStroke = null;
+});
+
+/* ============================================================== *
+                           CONTROLS
+   ============================================================== */
+function setTeeth(n) {
+  teeth = clamp(Math.round(n), 1, 9);
+  teethVal.textContent = teeth;
+}
+document.getElementById('t-down').addEventListener('click', () => { setTeeth(teeth - 1); markActivity(); });
+document.getElementById('t-up').addEventListener('click',   () => { setTeeth(teeth + 1); markActivity(); });
+
+document.getElementById('clear').addEventListener('click', () => {
+  fadeOutGrooves();
+  markActivity();
+});
+
+function fadeOutGrooves() {
+  const dur = 700;
+  const t0 = performance.now();
+  function step() {
+    const t = performance.now() - t0;
+    const p = clamp(t / dur, 0, 1);
+    // Fade the lit overlay back toward bare sand.
+    litCtx.save();
+    litCtx.globalCompositeOperation = 'destination-out';
+    litCtx.globalAlpha = 0.10 + p * 0.18;
+    litCtx.fillStyle = '#000';
+    litCtx.fillRect(0, 0, W, H);
+    litCtx.restore();
+    if (p < 1) requestAnimationFrame(step);
+    else {
+      litCtx.clearRect(0, 0, W, H);
+      heightCtx.fillStyle = `rgb(${FLAT},${FLAT},${FLAT})`;
+      heightCtx.fillRect(0, 0, W, H);   // smooth the sand back to flat
+      for (const rock of rocks) rock.rings = 0;
+      lastTapCenter = null;
+      activeStroke = null;
+      strokeQueue.length = 0;
+    }
+  }
+  step();
+}
+
+const ambientToggle = document.getElementById('ambient');
+function setAmbient(on) {
+  ambientOn = on;
+  ambientToggle.classList.toggle('on', on);
+  ambientToggle.setAttribute('aria-checked', on ? 'true' : 'false');
+  if (on) {
+    ambientAccumMs = 0;
+    ambientGapMs = 300 + Math.random() * 1200;
+    // Fire an immediate first stroke so the user knows it's working.
+    if (!activeStroke && rocks.length > 0) scheduleAmbientStroke();
+  }
+}
+ambientToggle.addEventListener('click', () => { setAmbient(!ambientOn); markActivity(); });
+ambientToggle.addEventListener('keydown', (e) => {
+  if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); setAmbient(!ambientOn); markActivity(); }
+});
+
+// Pace switcher
+function setPace(name) {
+  if (!PACE_MAP[name]) return;
+  paceMultiplier = PACE_MAP[name];
+  const sel = document.getElementById('pace-sel');
+  if (sel && sel.value !== name) sel.value = name;
+}
+document.getElementById('pace-sel').addEventListener('change', e => {
+  setPace(e.target.value); markActivity();
+});
+
+// Style switcher
+function setStyle(name) {
+  if (!STYLES[name] || name === currentStyle) return;
+  currentStyle = name;
+  document.querySelectorAll('.swatch').forEach(el => {
+    el.classList.toggle('active', el.dataset.style === name);
+  });
+  paintSand();
+  paintRocks();
+  // Existing grooves persist (their height is unchanged); re-light the whole
+  // field so their shadow/highlight tints match the new palette.
+  relightAll();
+}
+document.querySelectorAll('.swatch').forEach(el => {
+  el.addEventListener('click', () => { setStyle(el.dataset.style); markActivity(); });
+});
+
+/* ---- Controls visibility follows the cursor ----
+   Desktop: off-screen → hidden, on-screen → faded, in corner zone → active.
+   Touch: always faded; tapping bar → active for 2 s then back to faded. */
+const isTouch = window.matchMedia('(pointer: coarse)').matches;
+let barActiveTimer = null;
+
+function updateControlsVisibility(x, y) {
+  if (isTouch) return;
+  const r = controlsEl.getBoundingClientRect();
+  const margin = 70;
+  const inZone = x >= r.left - margin && x <= r.right + margin &&
+                 y >= r.top - margin && y <= r.bottom + margin;
+  if (inZone) {
+    controlsEl.classList.add('active');
+    controlsEl.classList.remove('faded');
+  } else {
+    controlsEl.classList.add('faded');
+    controlsEl.classList.remove('active');
+  }
+}
+function hideControls() {
+  if (isTouch) return;
+  controlsEl.classList.remove('active', 'faded');
+}
+
+// Touch: fab toggles the controls panel open/closed
+if (isTouch) {
+  const mobFab = document.getElementById('mob-fab');
+  mobFab.addEventListener('click', () => {
+    const isOpen = controlsEl.classList.toggle('mob-open');
+    mobFab.classList.toggle('open', isOpen);
+    mobFab.setAttribute('aria-label', isOpen ? 'Close garden settings' : 'Open garden settings');
+  });
+  // Tap canvas → close
+  cvs.addEventListener('touchstart', () => {
+    controlsEl.classList.remove('mob-open');
+    mobFab.classList.remove('open');
+  }, { passive: true });
+}
+
+window.addEventListener('mousemove', (e) => { updateControlsVisibility(e.clientX, e.clientY); });
+document.documentElement.addEventListener('mouseleave', hideControls);
+window.addEventListener('blur', hideControls);
+
+window.addEventListener('mousemove', markActivity);
+window.addEventListener('keydown', (e) => {
+  const n = parseInt(e.key, 10);
+  if (n >= 1 && n <= 9) { setTeeth(n); markActivity(); }
+  if (e.key === 'Escape' || e.key === 'c' || e.key === 'C') { fadeOutGrooves(); markActivity(); }
+  if (e.key === 'm' || e.key === 'M') { setAmbient(!ambientOn); markActivity(); }
+  if (e.key === 'a' || e.key === 'A') { setStyle('A'); markActivity(); }
+  if (e.key === 'b' || e.key === 'B') { setStyle('B'); markActivity(); }
+  // keep 'c' for clear; style C is reachable from the swatch
+});
+
+/* ============================================================== *
+                              RESIZE
+   ============================================================== */
+function resize() {
+  W = window.innerWidth;
+  H = window.innerHeight;
+  DPR = Math.min(2, window.devicePixelRatio || 1);
+  cvs.width = W * DPR;
+  cvs.height = H * DPR;
+  cvs.style.width = W + 'px';
+  cvs.style.height = H + 'px';
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+
+  // Groove buffers at CSS-pixel resolution (resizing smooths the garden flat).
+  for (const c of [heightLayer, litLayer, pvHeightLayer, pvLitLayer]) {
+    c.width = W; c.height = H;
+  }
+  heightCtx.fillStyle = `rgb(${FLAT},${FLAT},${FLAT})`;
+  heightCtx.fillRect(0, 0, W, H);
+
+  paintSand();
+  layoutRocks();
+  paintRocks();
+}
+window.addEventListener('resize', resize);
+resize();
+
+// Debug hook: force a single composite onto the visible canvas. Useful when
+// the preview tab is backgrounded and rAF is throttled to zero.
+window.__renderOnce = function() {
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.clearRect(0, 0, W, H);
+  ctx.drawImage(sandLayer, 0, 0, W, H);
+  ctx.drawImage(litLayer, 0, 0, W, H);
+  ctx.drawImage(rocksLayer, 0, 0, W, H);
+};
+
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
